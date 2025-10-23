@@ -1,0 +1,9 @@
+# Ignore database credentials
+config/database.php
+
+# Ignore environment files
+.env
+
+# Ignore IDE settings
+.vscode/
+.idea/
