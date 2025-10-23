@@ -7,26 +7,37 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 switch ($method) {
     case 'GET':
-        $manager_id = $_GET['manager_id'] ?? null;
-        if ($manager_id) {
-            $stmt = $db->prepare("SELECT * FROM tasks WHERE manager_id=:mid ORDER BY id ASC");
-            $stmt->execute([":mid" => $manager_id]);
-        } else {
-            $stmt = $db->query("SELECT * FROM tasks ORDER BY id ASC");
-        }
-        echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
-        break;
+    $manager_id = $_GET['manager_id'] ?? null;
+    if ($manager_id) {
+        $stmt = $db->prepare("SELECT * FROM tasks WHERE manager_id=:mid ORDER BY id ASC");
+        $stmt->execute([":mid" => $manager_id]);
+    } else {
+        $stmt = $db->query("SELECT * FROM tasks ORDER BY id ASC");
+    }
+    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+    break;
 
-    case 'POST':
-        $input = json_decode(file_get_contents("php://input"), true);
+
+   case 'POST':
+    $input = json_decode(file_get_contents("php://input"), true);
+
+    $manager_id = $input['manager_id'] ?? ($_GET['manager_id'] ?? null);
+    if (!$manager_id) {
+        http_response_code(400);
+        echo json_encode(["error" => "manager_id is required"]);
+        exit;
+    }
+
+    try {
         $query = "INSERT INTO tasks (name, hours_required, manager_id) VALUES (:name, :hours, :mid)";
         $stmt = $db->prepare($query);
         $stmt->execute([
             ":name" => $input['name'],
             ":hours" => $input['hours_required'],
-            ":mid" => $input['manager_id']
+            ":mid" => $manager_id
         ]);
 
+        // Optional: link employees if any
         if (!empty($input['employees'])) {
             $task_id = $db->lastInsertId();
             $linkQuery = $db->prepare("INSERT INTO task_assignments (task_id, employee_id) VALUES (:tid, :eid)");
@@ -36,7 +47,17 @@ switch ($method) {
         }
 
         echo json_encode(["message" => "Task created"]);
-        break;
+    } catch (PDOException $e) {
+        if ($e->getCode() == 23000) { // duplicate key error
+            http_response_code(409);
+            echo json_encode(["error" => "Task with the same name already exists for this manager"]);
+        } else {
+            http_response_code(500);
+            echo json_encode(["error" => $e->getMessage()]);
+        }
+    }
+    break;
+
 
     case 'PUT':
         $input = json_decode(file_get_contents("php://input"), true);
