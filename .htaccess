@@ -1,7 +1,4 @@
 RewriteEngine On
-RewriteBase /workload-backend-php/
-
-# Route all non-file, non-folder requests to index.php
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^(.*)$ index.php [QSA,L]

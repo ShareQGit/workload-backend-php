@@ -1,10 +1,12 @@
 <?php
 require_once __DIR__ . '/../config/database.php';
-
+require_once __DIR__ . '/../middleware/auth.php';
+requireAuth();
+ 
 $database = new Database();
 $db = $database->getConnection();
 $method = $_SERVER['REQUEST_METHOD'];
-
+ 
 switch ($method) {
     case 'GET':
         $stmt = $db->query("
@@ -14,19 +16,19 @@ switch ($method) {
         ");
         echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
         break;
-
+ 
     case 'POST':
         $input = json_decode(file_get_contents("php://input"), true);
-
+ 
         if (!$input) {
             echo json_encode(["error" => "No input received"]);
             exit;
         }
-
+ 
         $query = "INSERT INTO employees (name, type, hours_per_day, days_per_month, manager_id)
                   VALUES (:name, :type, :hours_per_day, :days_per_month, :manager_id)";
         $stmt = $db->prepare($query);
-
+ 
         try {
             $stmt->execute([
                 ":name" => $input['name'],
@@ -40,25 +42,25 @@ switch ($method) {
             echo json_encode(["error" => $e->getMessage()]);
         }
         break;
-
+ 
     case 'PUT':
         $input = json_decode(file_get_contents("php://input"), true);
-
+ 
         if (!$input || !isset($input['id'])) {
             http_response_code(400);
             echo json_encode(["error" => "Employee ID is required for update"]);
             exit;
         }
-
-        $query = "UPDATE employees 
-                  SET name = :name, 
-                      type = :type, 
-                      hours_per_day = :hours_per_day, 
+ 
+        $query = "UPDATE employees
+                  SET name = :name,
+                      type = :type,
+                      hours_per_day = :hours_per_day,
                       days_per_month = :days_per_month
                   WHERE id = :id";
-
+ 
         $stmt = $db->prepare($query);
-
+ 
         try {
             $stmt->execute([
                 ":id" => $input['id'],
@@ -72,7 +74,7 @@ switch ($method) {
             echo json_encode(["error" => $e->getMessage()]);
         }
         break;
-
+ 
     case 'DELETE':
         $id = $_GET['id'] ?? null;
         if ($id) {
@@ -81,7 +83,7 @@ switch ($method) {
             echo json_encode(["message" => "Employee deleted"]);
         }
         break;
-
+ 
     default:
         http_response_code(405);
         echo json_encode(["message" => "Method not allowed"]);

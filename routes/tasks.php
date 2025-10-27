@@ -1,10 +1,12 @@
 <?php
 require_once __DIR__ . '/../config/database.php';
-
+require_once __DIR__ . '/../middleware/auth.php';
+requireAuth();
+ 
 $database = new Database();
 $db = $database->getConnection();
 $method = $_SERVER['REQUEST_METHOD'];
-
+ 
 switch ($method) {
     case 'GET':
     $manager_id = $_GET['manager_id'] ?? null;
@@ -16,18 +18,18 @@ switch ($method) {
     }
     echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
     break;
-
-
+ 
+ 
    case 'POST':
     $input = json_decode(file_get_contents("php://input"), true);
-
+ 
     $manager_id = $input['manager_id'] ?? ($_GET['manager_id'] ?? null);
     if (!$manager_id) {
         http_response_code(400);
         echo json_encode(["error" => "manager_id is required"]);
         exit;
     }
-
+ 
     try {
         $query = "INSERT INTO tasks (name, hours_required, manager_id) VALUES (:name, :hours, :mid)";
         $stmt = $db->prepare($query);
@@ -36,7 +38,7 @@ switch ($method) {
             ":hours" => $input['hours_required'],
             ":mid" => $manager_id
         ]);
-
+ 
         // Optional: link employees if any
         if (!empty($input['employees'])) {
             $task_id = $db->lastInsertId();
@@ -45,7 +47,7 @@ switch ($method) {
                 $linkQuery->execute([":tid" => $task_id, ":eid" => $eid]);
             }
         }
-
+ 
         echo json_encode(["message" => "Task created"]);
     } catch (PDOException $e) {
         if ($e->getCode() == 23000) { // duplicate key error
@@ -57,8 +59,8 @@ switch ($method) {
         }
     }
     break;
-
-
+ 
+ 
     case 'PUT':
         $input = json_decode(file_get_contents("php://input"), true);
         if (!$input || !isset($input['id'])) {
@@ -66,9 +68,9 @@ switch ($method) {
             echo json_encode(["error" => "Task ID is required for update"]);
             exit;
         }
-
-        $query = "UPDATE tasks 
-                  SET name = :name, hours_required = :hours_required 
+ 
+        $query = "UPDATE tasks
+                  SET name = :name, hours_required = :hours_required
                   WHERE id = :id";
         $stmt = $db->prepare($query);
         $stmt->execute([
@@ -76,25 +78,25 @@ switch ($method) {
             ":name" => $input['name'],
             ":hours_required" => $input['hours_required']
         ]);
-
+ 
         // Optional: update assigned employees
         if (isset($input['employees'])) {
             $task_id = $input['id'];
-
+ 
             // Delete old links
             $db->prepare("DELETE FROM task_assignments WHERE task_id = :tid")
                ->execute([":tid" => $task_id]);
-
+ 
             // Add new ones
             $linkQuery = $db->prepare("INSERT INTO task_assignments (task_id, employee_id) VALUES (:tid, :eid)");
             foreach ($input['employees'] as $eid) {
                 $linkQuery->execute([":tid" => $task_id, ":eid" => $eid]);
             }
         }
-
+ 
         echo json_encode(["message" => "Task updated"]);
         break;
-
+ 
     case 'DELETE':
         $id = $_GET['id'] ?? null;
         if ($id) {
@@ -103,11 +105,10 @@ switch ($method) {
             echo json_encode(["message" => "Task deleted"]);
         }
         break;
-
+ 
     default:
         http_response_code(405);
         echo json_encode(["message" => "Method not allowed"]);
         break;
 }
 ?>
-
